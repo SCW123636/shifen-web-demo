@@ -159,7 +159,7 @@ describe("StudyPage", () => {
     await user.click(screen.getByRole("button", { name: "确认批改并更新路线" }));
 
     expect(screen.getByText(/下一步暂时不可用/)).toBeVisible();
-    expect(screen.getByText(/有效证据 ev_demo_q-paper-2024-05 已记录/)).toBeVisible();
+    expect(screen.getByText(/有效证据 ev_demo_q-paper-2024-05_incorrect 已记录/)).toBeVisible();
     expect(screen.queryByText("路线已更新")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "重新生成下一步" }));
@@ -202,27 +202,41 @@ describe("StudyPage", () => {
 
   it("does not award XP twice when the same confirmed question is retried", async () => {
     const user = userEvent.setup();
-    const first = renderPage();
+    renderPage();
 
     await user.selectOptions(screen.getByLabelText("演示场景"), "correct");
     await user.type(screen.getByLabelText("文字答案"), "比较驻点和两个端点。");
     await user.click(screen.getByRole("button", { name: "提交批改" }));
     await user.click(screen.getByRole("button", { name: "确认批改并更新路线" }));
-    await user.click(screen.getByRole("button", { name: "下一道原题" }));
-    await user.type(screen.getByLabelText("文字答案"), "继续求导并比较边界。");
-    await user.click(screen.getByRole("button", { name: "提交批改" }));
-    await user.click(screen.getByRole("button", { name: "确认批改并更新路线" }));
-    expect(screen.getByRole("status", { name: "常驻修行摘要" })).toHaveTextContent("10 XP");
+    expect(screen.getByRole("status", { name: "常驻修行摘要" })).toHaveTextContent("5 XP");
 
-    first.unmount();
-    renderPage();
-    await user.selectOptions(screen.getByLabelText("演示场景"), "correct");
+    await user.click(screen.getByRole("button", { name: "重新练习本题" }));
     await user.type(screen.getByLabelText("文字答案"), "再次比较驻点和两个端点。");
     await user.click(screen.getByRole("button", { name: "提交批改" }));
     await user.click(screen.getByRole("button", { name: "确认批改并更新路线" }));
 
-    expect(screen.getByRole("status", { name: "常驻修行摘要" })).toHaveTextContent("10 XP");
-    expect(screen.getByText("2 条有效证据")).toBeVisible();
+    expect(screen.getByRole("status", { name: "常驻修行摘要" })).toHaveTextContent("5 XP");
+    expect(screen.getByText("1 条有效证据")).toBeVisible();
+  });
+
+  it("replaces an incorrect evidence version and awards XP for corrected work", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByLabelText("文字答案"), "只比较驻点，遗漏端点。");
+    await user.click(screen.getByRole("button", { name: "提交批改" }));
+    await user.click(screen.getByRole("button", { name: "确认批改并更新路线" }));
+    expect(screen.getByRole("status", { name: "常驻修行摘要" })).toHaveTextContent("0 XP");
+
+    await user.click(screen.getByRole("button", { name: "重新练习本题" }));
+    await user.selectOptions(screen.getByLabelText("演示场景"), "correct");
+    await user.type(screen.getByLabelText("文字答案"), "比较驻点和两个端点。");
+    await user.click(screen.getByRole("button", { name: "提交批改" }));
+    await user.click(screen.getByRole("button", { name: "确认批改并更新路线" }));
+
+    expect(screen.getByRole("status", { name: "常驻修行摘要" })).toHaveTextContent("5 XP");
+    expect(screen.getByText("1 条有效证据")).toBeVisible();
+    expect(screen.getByRole("heading", { name: /ev_demo_q-paper-2024-05_correct 已记录/ })).toBeVisible();
   });
 
   it("moves focus to the diagnosis and receipt as the evidence stages advance", async () => {
@@ -234,7 +248,7 @@ describe("StudyPage", () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "暂判有误" })));
 
     await user.click(screen.getByRole("button", { name: "确认批改并更新路线" }));
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: /有效证据 ev_demo_q-paper-2024-05 已记录/ })));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: /有效证据 ev_demo_q-paper-2024-05_incorrect 已记录/ })));
   });
 
   it("switches to the matching demo course pack when the learner selects probability", () => {
@@ -417,14 +431,14 @@ describe("StudyPage", () => {
 
     const cultivation = screen.getByRole("region", { name: "修行进度" });
     expect(within(cultivation).getByText("最近有效证据")).toBeVisible();
-    expect(within(cultivation).getByText("ev_demo_q-paper-2024-05")).toBeVisible();
+    expect(within(cultivation).getByText("ev_demo_q-paper-2024-05_correct")).toBeVisible();
     expect(within(cultivation).getByText("导数与最值判定 · 修习中")).toBeVisible();
     expect(within(cultivation).queryByText("支撑证据")).not.toBeInTheDocument();
   });
 
   it("stops at a truthful completion state when the unseen original pool is exhausted", async () => {
     const user = userEvent.setup();
-    renderPage();
+    const first = renderPage();
 
     await user.selectOptions(screen.getByLabelText("演示场景"), "correct");
     await user.type(screen.getByLabelText("文字答案"), "比较驻点和两个端点。");
@@ -438,5 +452,12 @@ describe("StudyPage", () => {
     expect(screen.getByText("本轮可信未做原题已完成")).toBeVisible();
     expect(screen.getByText("可信未做原题池：本轮已完成")).toBeVisible();
     expect(screen.queryByRole("button", { name: "下一道原题" })).not.toBeInTheDocument();
+
+    first.unmount();
+    renderPage();
+
+    expect(screen.getByRole("heading", { name: "本轮可信未做原题已完成" })).toBeVisible();
+    expect(within(screen.getByLabelText("本轮学习结果")).getByText("2 条有效证据")).toBeVisible();
+    expect(screen.queryByLabelText("文字答案")).not.toBeInTheDocument();
   });
 });

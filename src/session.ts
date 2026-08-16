@@ -28,11 +28,19 @@ export const defaultDemoProfile: DemoProfile = {
 };
 
 function canUseStorage() {
-  return typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
+  try {
+    return typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
+  } catch {
+    return false;
+  }
 }
 
 function canUseLocalStorage() {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+  try {
+    return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+  } catch {
+    return false;
+  }
 }
 
 function progressKey(courseName: string) {
@@ -60,7 +68,11 @@ export function loadDemoProfile(): DemoProfile {
 
 export function saveDemoProfile(profile: DemoProfile) {
   if (!canUseStorage()) return;
-  window.sessionStorage.setItem(DEMO_PROFILE_KEY, JSON.stringify(profile));
+  try {
+    window.sessionStorage.setItem(DEMO_PROFILE_KEY, JSON.stringify(profile));
+  } catch {
+    // The static demo remains usable when browser policy disables persistence.
+  }
 }
 
 export function loadDemoProgress(courseName: string): DemoProgress {
@@ -89,7 +101,11 @@ export function loadDemoProgress(courseName: string): DemoProgress {
 
 export function saveDemoProgress(courseName: string, progress: DemoProgress) {
   if (!canUseLocalStorage()) return;
-  window.localStorage.setItem(progressKey(courseName), JSON.stringify(progress));
+  try {
+    window.localStorage.setItem(progressKey(courseName), JSON.stringify(progress));
+  } catch {
+    // The current session can continue even if progress cannot be persisted.
+  }
 }
 
 export function daysUntilExam(examDate: string) {

@@ -38,6 +38,15 @@ type AnswerMode = "text" | "photo";
 const MAX_PHOTO_COUNT = 6;
 const MAX_PHOTO_SIZE = 12 * 1024 * 1024;
 
+function evidenceIdFor(questionId: string, correct: boolean) {
+  return `ev_demo_${questionId}_${correct ? "correct" : "incorrect"}`;
+}
+
+function isEvidenceForQuestion(evidenceId: string, questionId: string) {
+  const legacyId = `ev_demo_${questionId}`;
+  return evidenceId === legacyId || evidenceId.startsWith(`${legacyId}_`);
+}
+
 function PersonalPath({
   phase,
   profile,
@@ -184,7 +193,7 @@ function StudyWorkspace({
     }
   }, [phase]);
 
-  const currentEvidenceId = `ev_demo_${question.questionId}`;
+  const currentEvidenceId = evidenceIdFor(question.questionId, scenario === "correct");
   const evidenceId = phase === "confirmed" || phase === "unavailable" ? currentEvidenceId : undefined;
   const latestEvidenceId = confirmedEvidenceIds[confirmedEvidenceIds.length - 1];
   const isCorrect = scenario === "correct";
@@ -232,11 +241,18 @@ function StudyWorkspace({
   }
 
   function confirmAnswer() {
-    const isNewEvidence = !confirmedEvidenceIds.includes(currentEvidenceId);
-    setConfirmationXpDelta(isNewEvidence && isCorrect ? 5 : 0);
-    if (isNewEvidence) {
-      setConfirmedEvidenceIds(current => [...current, currentEvidenceId]);
-      if (isCorrect) setEarnedXp(current => current + 5);
+    const previousEvidenceId = confirmedEvidenceIds.find(id => isEvidenceForQuestion(id, question.questionId));
+    const isSameVersion = previousEvidenceId === currentEvidenceId;
+    const previousWasCorrect = previousEvidenceId?.endsWith("_correct") ?? false;
+    const xpDelta = isSameVersion ? 0 : isCorrect ? 5 : previousWasCorrect ? -5 : 0;
+
+    setConfirmationXpDelta(Math.max(0, xpDelta));
+    if (!isSameVersion) {
+      setConfirmedEvidenceIds(current => [
+        ...current.filter(id => !isEvidenceForQuestion(id, question.questionId)),
+        currentEvidenceId,
+      ]);
+      if (xpDelta !== 0) setEarnedXp(current => Math.max(0, current + xpDelta));
     }
     if (scenario === "downstream_failure" && !retryRecovered) {
       setPhase("unavailable");
@@ -282,6 +298,44 @@ function StudyWorkspace({
     if (withinSizeLimit.length > MAX_PHOTO_COUNT) errors.push("最多上传 6 张图片");
     setPhotoFiles(withinSizeLimit.slice(0, MAX_PHOTO_COUNT));
     setPhotoError(errors.join("；"));
+  }
+
+  const roundCompleteOnMount = questions.every(item => initialProgress.attemptedIds.includes(item.questionId));
+  if (roundCompleteOnMount) {
+    const completionRealm = earnedXp > 0 ? "引气 · 一层" : "未入道";
+    const completionEvidenceId = confirmedEvidenceIds[confirmedEvidenceIds.length - 1];
+
+    return (
+      <AppShell
+        availableSections={{ diagnosis: false, history: false, route: false }}
+        aside={
+          <CultivationPanel
+            checkpoint="本轮原题已完成"
+            evidenceCount={confirmedEvidenceIds.length}
+            evidenceId={completionEvidenceId}
+            realm={completionRealm}
+            status="ready"
+            xp={earnedXp}
+          />
+        }
+        cultivation={{ realm: completionRealm, status: "ready", xp: earnedXp }}
+        profile={profile}
+      >
+        <section className="round-complete" aria-labelledby="round-complete-heading">
+          <CheckCircle2 aria-hidden="true" size={30} />
+          <span className="eyebrow">可信原题池</span>
+          <h1 id="round-complete-heading">本轮可信未做原题已完成</h1>
+          <p>本轮作答记录已保留。下一阶段可进入间隔复习与变式迁移，修行进度继续沿用已确认的有效证据。</p>
+          <div className="completion-metrics" aria-label="本轮学习结果">
+            <div><span>当前证据</span><strong>{confirmedEvidenceIds.length} 条有效证据</strong></div>
+            <div><span>修行进度</span><strong>{earnedXp} XP</strong></div>
+          </div>
+          <Link className="primary-button" to="/setup">
+            调整下一轮计划<ArrowRight aria-hidden="true" size={17} />
+          </Link>
+        </section>
+      </AppShell>
+    );
   }
 
   const aside = (
@@ -544,11 +598,17 @@ function StudyWorkspace({
                     <div className="receipt-block success" id="history">
                       <div><CheckCircle2 aria-hidden="true" size={19} /><h2 ref={receiptHeadingRef} tabIndex={-1}>有效证据 {evidenceId} 已记录</h2></div>
                       <p><b>路线已更新</b> · {isCorrect ? "该知识点掌握估计上调，进入间隔复习。" : `先完成“${question.correctionFocus}”，再做同类原题。`}</p>
-                      {unseenQuestionCount > 0 ? (
-                        <button className="primary-button" onClick={nextQuestion} type="button">
-                          下一道原题<ArrowRight aria-hidden="true" size={17} />
+                      <div className="action-row receipt-actions">
+                        <button className="secondary-button" onClick={resetAnswer} type="button">
+                          <RefreshCw aria-hidden="true" size={17} />重新练习本题
                         </button>
-                      ) : (
+                        {unseenQuestionCount > 0 ? (
+                          <button className="primary-button" onClick={nextQuestion} type="button">
+                            下一道原题<ArrowRight aria-hidden="true" size={17} />
+                          </button>
+                        ) : null}
+                      </div>
+                      {unseenQuestionCount === 0 ? (
                         <div className="pool-complete" role="status">
                           <CheckCircle2 aria-hidden="true" size={18} />
                           <div>
@@ -556,7 +616,7 @@ function StudyWorkspace({
                             <span>下一阶段进入间隔复习与变式迁移。</span>
                           </div>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   ) : null}
                 </>

@@ -55,7 +55,7 @@ export function SetupPage() {
         <div className="setup-heading">
           <span className="eyebrow">新课程</span>
           <h1>建立你的期末复习路径</h1>
-          <p>高价值原题会结合目标、基础、作答表现和可用时间动态排序。</p>
+          <p>本 Demo 会记录目标、基础与可用时间，并用预置分支演示后续个性化路线；当前静态版本尚未调用在线规划服务。</p>
         </div>
 
         <form onSubmit={event => { event.preventDefault(); start(); }}>

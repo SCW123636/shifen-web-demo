@@ -306,6 +306,23 @@ textarea::placeholder { color: #6f7984; }
 .unsupported-course > svg { color: #9a6c00; margin-bottom: 16px; }
 .unsupported-course h1 { font-family: "Noto Serif SC", serif; font-size: 22px; line-height: 1.5; margin: 5px 0 8px; overflow-wrap: anywhere; }
 .unsupported-course p { color: #59636e; font-size: 13px; line-height: 1.8; margin: 0 0 20px; }
+.round-complete {
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+  border-top: 4px solid var(--evidence-green);
+  margin: clamp(36px, 8vh, 88px) auto 0;
+  max-width: 720px;
+  padding: clamp(28px, 5vw, 48px);
+}
+.round-complete > svg { color: var(--evidence-green); margin-bottom: 14px; }
+.round-complete h1 { font-family: "Noto Serif SC", serif; font-size: 24px; line-height: 1.45; margin: 6px 0 10px; }
+.round-complete > p { color: #59636e; font-size: 13px; line-height: 1.8; margin: 0 0 24px; }
+.completion-metrics { border-bottom: 1px solid var(--line); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 24px; }
+.completion-metrics > div { display: flex; flex-direction: column; gap: 5px; padding: 15px 0; }
+.completion-metrics > div + div { border-left: 1px solid var(--line); padding-left: 20px; }
+.completion-metrics span { color: var(--muted); font-size: 11px; }
+.completion-metrics strong { font-family: "IBM Plex Mono", monospace; font-size: 14px; }
+.receipt-actions { margin-top: 12px; }
 
 .setup-page { margin: 0 auto; max-width: 900px; }
 .setup-heading { border-bottom: 1px solid #d3d8de; padding-bottom: 20px; }
@@ -382,6 +399,9 @@ textarea::placeholder { color: #6f7984; }
   .setup-page fieldset, .materials-fieldset, .setup-submit { grid-column: 1; }
   .setup-heading h1 { font-size: 22px; }
   .unsupported-course { margin-top: 5vh; padding: 24px 20px; }
+  .round-complete { margin-top: 4vh; padding: 26px 20px; }
+  .completion-metrics { grid-template-columns: 1fr; }
+  .completion-metrics > div + div { border-left: 0; border-top: 1px solid var(--line); padding-left: 0; }
 }
 
 @media (max-width: 380px) {
