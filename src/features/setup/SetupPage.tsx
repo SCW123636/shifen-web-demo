@@ -30,7 +30,7 @@ export function SetupPage() {
   const resetRound = new URLSearchParams(location.search).get("reset") === "1";
   const [files, setFiles] = useState<File[]>([]);
   const [building, setBuilding] = useState(false);
-  const [storageWarning, setStorageWarning] = useState(false);
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const [courseName, setCourseName] = useState(initialProfile.courseName);
   const [examDate, setExamDate] = useState(initialProfile.examDate);
   const [targetScore, setTargetScore] = useState(initialProfile.targetScore);
@@ -52,9 +52,13 @@ export function SetupPage() {
       materialCount: files.length || 8,
       materialSource: files.length ? "uploaded" : "demo",
     };
-    if (resetRound) clearDemoProgress(profile.courseName);
+    const roundCleared = resetRound ? clearDemoProgress(profile.courseName) : true;
     const persisted = saveDemoProfile(profile);
-    setStorageWarning(!persisted);
+    const warnings = [
+      !roundCleared ? "旧进度清理失败，本轮仅在当前会话从空进度开始；刷新后可能恢复旧进度。" : null,
+      !persisted ? "浏览器拒绝本地存储，本次约束仅保留在当前会话；刷新后可能恢复默认值。" : null,
+    ].filter((warning): warning is string => Boolean(warning));
+    setStorageWarning(warnings.length ? warnings.join(" ") : null);
     setBuilding(true);
     window.setTimeout(() => navigate("/study/course_calculus_2026"), 650);
   }
@@ -152,7 +156,7 @@ export function SetupPage() {
             <div>
               <p><ShieldCheck aria-hidden="true" size={16} />上传文件不会离开本机；学习进度保存在本机浏览器。</p>
               {storageWarning ? (
-                <p className="storage-warning" role="alert">浏览器拒绝本地存储，本次约束仅保留在当前会话；刷新后可能恢复默认值。</p>
+                <p className="storage-warning" role="alert">{storageWarning}</p>
               ) : null}
             </div>
             <button

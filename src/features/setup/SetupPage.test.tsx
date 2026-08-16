@@ -116,3 +116,24 @@ it("warns when constraints can only be kept for the current session", async () =
   await user.click(screen.getByRole("button", { name: "建立复习路径" }));
   expect(screen.getByRole("alert")).toHaveTextContent("本次约束仅保留在当前会话");
 });
+
+it("warns when a new round cannot clear persisted progress", async () => {
+  const user = userEvent.setup();
+  saveDemoProgress("高等数学（上）", {
+    attemptedIds: ["q-paper-2024-05"],
+    confirmedEvidenceIds: ["ev_demo_q-paper-2024-05_correct"],
+    earnedXp: 5,
+  });
+  vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+    throw new DOMException("Storage denied", "SecurityError");
+  });
+
+  render(
+    <MemoryRouter initialEntries={["/setup?reset=1"]}>
+      <SetupPage />
+    </MemoryRouter>,
+  );
+
+  await user.click(screen.getByRole("button", { name: "建立复习路径" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("旧进度清理失败");
+});

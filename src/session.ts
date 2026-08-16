@@ -82,6 +82,7 @@ function normalizeProgress(progress: Partial<DemoProgress>): DemoProgress {
 }
 
 export function loadDemoProfile(): DemoProfile {
+  if (profileStorageFallback && volatileDemoProfile) return volatileDemoProfile;
   if (!canUseStorage()) return volatileDemoProfile ?? defaultDemoProfile;
   try {
     const stored = window.sessionStorage.getItem(DEMO_PROFILE_KEY);
@@ -125,6 +126,7 @@ export function isDemoProfileVolatile() {
 export function loadDemoProgress(courseName: string): DemoProgress {
   const empty: DemoProgress = { attemptedIds: [], confirmedEvidenceIds: [], earnedXp: 0 };
   const key = progressKey(courseName);
+  if (progressStorageFallback.has(key)) return volatileDemoProgress.get(key) ?? empty;
   if (!canUseLocalStorage()) return volatileDemoProgress.get(key) ?? empty;
   try {
     const stored = window.localStorage.getItem(key);
@@ -155,13 +157,19 @@ export function saveDemoProgress(courseName: string, progress: DemoProgress) {
   }
 }
 
+export function isDemoProgressVolatile(courseName: string) {
+  return progressStorageFallback.has(progressKey(courseName));
+}
+
 export function clearDemoProgress(courseName: string) {
   const key = progressKey(courseName);
-  volatileDemoProgress.delete(key);
-  progressStorageFallback.delete(key);
+  const empty: DemoProgress = { attemptedIds: [], confirmedEvidenceIds: [], earnedXp: 0 };
+  volatileDemoProgress.set(key, empty);
+  progressStorageFallback.add(key);
   if (!canUseLocalStorage()) return false;
   try {
     window.localStorage.removeItem(key);
+    progressStorageFallback.delete(key);
     return true;
   } catch {
     return false;

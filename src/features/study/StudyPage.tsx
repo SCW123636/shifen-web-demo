@@ -27,6 +27,7 @@ import {
 } from "../../model";
 import {
   isDemoProfileVolatile,
+  isDemoProgressVolatile,
   loadDemoProfile,
   loadDemoProgress,
   saveDemoProgress,
@@ -145,10 +146,11 @@ function UnsupportedCourse({ profile }: { profile: DemoProfile }) {
 export function StudyPage() {
   const profile = useMemo(loadDemoProfile, []);
   const profileIsVolatile = useMemo(isDemoProfileVolatile, []);
+  const progressIsVolatile = useMemo(() => isDemoProgressVolatile(profile.courseName), [profile.courseName]);
   const questions = useMemo(() => questionsForCourse(profile.courseName), [profile.courseName]);
 
   if (!questions) return <UnsupportedCourse profile={profile} />;
-  return <StudyWorkspace profile={profile} profileIsVolatile={profileIsVolatile} questions={questions} />;
+  return <StudyWorkspace profile={profile} profileIsVolatile={profileIsVolatile || progressIsVolatile} questions={questions} />;
 }
 
 function StudyWorkspace({
@@ -312,7 +314,8 @@ function StudyWorkspace({
   }
 
   const roundCompleteOnMount = questions.every(item => initialProgress.attemptedIds.includes(item.questionId));
-  if (roundCompleteOnMount) {
+  const roundCompleteNow = questions.every(item => attemptedIds.includes(item.questionId));
+  if (roundCompleteOnMount || (roundCompleteNow && phase === "confirmed")) {
     const completionRealm = earnedXp > 0 ? "引气 · 一层" : "未入道";
     const completionEvidenceId = confirmedEvidenceIds[confirmedEvidenceIds.length - 1];
     const hasEffectiveEvidence = confirmedEvidenceIds.length > 0;

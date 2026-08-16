@@ -471,9 +471,10 @@ describe("StudyPage", () => {
     await user.click(screen.getByRole("button", { name: "提交批改" }));
     await user.click(screen.getByRole("button", { name: "确认批改并更新路线" }));
 
-    expect(screen.getByText("本轮可信未做原题已完成")).toBeVisible();
-    expect(screen.getByText("可信未做原题池：本轮已完成")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "本轮可信未做原题已完成" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "下一道原题" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "开启新的演示轮次" })).toHaveAttribute("href", "/setup?reset=1");
+    expect(screen.queryByLabelText("文字答案")).not.toBeInTheDocument();
 
     first.unmount();
     renderPage();
