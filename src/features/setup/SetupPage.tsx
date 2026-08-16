@@ -1,10 +1,16 @@
 import { ArrowRight, CalendarDays, Clock3, FileUp, GraduationCap, ShieldCheck, Target } from "lucide-react";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { AppShell } from "../../components/AppShell";
 import { CultivationPanel } from "../../components/CultivationPanel";
-import { saveDemoProfile, type DemoProfile } from "../../session";
+import {
+  clearDemoProgress,
+  loadDemoProfile,
+  loadDemoProgress,
+  saveDemoProfile,
+  type DemoProfile,
+} from "../../session";
 
 const foundationLabels = {
   beginner: "刚开始系统复习",
@@ -12,16 +18,29 @@ const foundationLabels = {
   steady: "基础稳定，需要强化迁移",
 } as const;
 
+function foundationKeyFor(label: string): keyof typeof foundationLabels {
+  return (Object.entries(foundationLabels).find(([, value]) => value === label)?.[0]
+    ?? "basic") as keyof typeof foundationLabels;
+}
+
 export function SetupPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialProfile = useMemo(loadDemoProfile, []);
+  const resetRound = new URLSearchParams(location.search).get("reset") === "1";
   const [files, setFiles] = useState<File[]>([]);
   const [building, setBuilding] = useState(false);
-  const [courseName, setCourseName] = useState("高等数学（上）");
-  const [examDate, setExamDate] = useState("2026-08-28");
-  const [targetScore, setTargetScore] = useState(80);
-  const [foundation, setFoundation] = useState<keyof typeof foundationLabels>("basic");
-  const [dailyMinutes, setDailyMinutes] = useState(45);
-  const [useDemoMaterials, setUseDemoMaterials] = useState(true);
+  const [storageWarning, setStorageWarning] = useState(false);
+  const [courseName, setCourseName] = useState(initialProfile.courseName);
+  const [examDate, setExamDate] = useState(initialProfile.examDate);
+  const [targetScore, setTargetScore] = useState(initialProfile.targetScore);
+  const [foundation, setFoundation] = useState<keyof typeof foundationLabels>(() => foundationKeyFor(initialProfile.foundation));
+  const [dailyMinutes, setDailyMinutes] = useState(initialProfile.dailyMinutes);
+  const [useDemoMaterials, setUseDemoMaterials] = useState(initialProfile.materialSource === "demo");
+  const cultivationProgress = useMemo(() => loadDemoProgress(courseName), [courseName]);
+  const cultivationRealm = cultivationProgress.earnedXp > 0 ? "引气 · 一层" : "未入道";
+  const cultivationStatus = cultivationProgress.confirmedEvidenceIds.length > 0 ? "ready" as const : "pending" as const;
+  const latestEvidenceId = cultivationProgress.confirmedEvidenceIds[cultivationProgress.confirmedEvidenceIds.length - 1];
 
   function start() {
     const profile: DemoProfile = {
@@ -33,7 +52,9 @@ export function SetupPage() {
       materialCount: files.length || 8,
       materialSource: files.length ? "uploaded" : "demo",
     };
-    saveDemoProfile(profile);
+    if (resetRound) clearDemoProgress(profile.courseName);
+    const persisted = saveDemoProfile(profile);
+    setStorageWarning(!persisted);
     setBuilding(true);
     window.setTimeout(() => navigate("/study/course_calculus_2026"), 650);
   }
@@ -42,13 +63,15 @@ export function SetupPage() {
     <AppShell
       aside={
         <CultivationPanel
-          checkpoint="等待课程证据"
-          realm="未入道"
-          status="pending"
-          xp={0}
+          checkpoint={cultivationProgress.confirmedEvidenceIds.length ? "课程设置中" : "等待课程证据"}
+          evidenceCount={cultivationProgress.confirmedEvidenceIds.length}
+          evidenceId={latestEvidenceId}
+          realm={cultivationRealm}
+          status={cultivationStatus}
+          xp={cultivationProgress.earnedXp}
         />
       }
-      cultivation={{ realm: "未入道", status: "pending", xp: 0 }}
+      cultivation={{ realm: cultivationRealm, status: cultivationStatus, xp: cultivationProgress.earnedXp }}
       setup
     >
       <section className="setup-page">
@@ -56,6 +79,9 @@ export function SetupPage() {
           <span className="eyebrow">新课程</span>
           <h1>建立你的期末复习路径</h1>
           <p>本 Demo 会记录目标、基础与可用时间，并用预置分支演示后续个性化路线；当前静态版本尚未调用在线规划服务。</p>
+          {resetRound ? (
+            <p className="reset-round-note" role="note">开始后会清除本课程的本地演示进度，并从第一道样例原题重新开始。</p>
+          ) : null}
         </div>
 
         <form onSubmit={event => { event.preventDefault(); start(); }}>
@@ -123,7 +149,12 @@ export function SetupPage() {
           </fieldset>
 
           <div className="setup-submit">
-            <p><ShieldCheck aria-hidden="true" size={16} />上传文件不会离开本机；学习进度保存在本机浏览器。</p>
+            <div>
+              <p><ShieldCheck aria-hidden="true" size={16} />上传文件不会离开本机；学习进度保存在本机浏览器。</p>
+              {storageWarning ? (
+                <p className="storage-warning" role="alert">浏览器拒绝本地存储，本次约束仅保留在当前会话；刷新后可能恢复默认值。</p>
+              ) : null}
+            </div>
             <button
               className="primary-button"
               disabled={building || (!files.length && !useDemoMaterials)}

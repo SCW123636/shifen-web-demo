@@ -322,12 +322,14 @@ textarea::placeholder { color: #6f7984; }
 .completion-metrics > div + div { border-left: 1px solid var(--line); padding-left: 20px; }
 .completion-metrics span { color: var(--muted); font-size: 11px; }
 .completion-metrics strong { font-family: "IBM Plex Mono", monospace; font-size: 14px; }
+.completion-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; }
 .receipt-actions { margin-top: 12px; }
 
 .setup-page { margin: 0 auto; max-width: 900px; }
 .setup-heading { border-bottom: 1px solid #d3d8de; padding-bottom: 20px; }
 .setup-heading h1 { font-family: "Noto Serif SC", serif; font-size: 26px; margin: 5px 0 8px; }
 .setup-heading p { color: var(--muted); font-size: 13px; margin: 0; }
+.setup-heading .reset-round-note { border-left: 3px solid var(--highlighter-yellow); color: #62541c; line-height: 1.6; margin-top: 12px; padding: 7px 10px; }
 .setup-page form { display: grid; gap: 1px; grid-template-columns: 1fr 1fr; margin-top: 22px; }
 .setup-page fieldset { background: var(--paper); border: 1px solid #d5dae0; display: grid; gap: 15px; margin: 0; min-width: 0; padding: 20px 22px 24px; }
 .setup-page legend { align-items: center; background: var(--shell); display: flex; font-size: 13px; font-weight: 600; gap: 7px; padding: 0 8px; }
@@ -350,6 +352,9 @@ textarea::placeholder { color: #6f7984; }
 .material-boundary-note { color: var(--muted); font-size: 11px; line-height: 1.7; margin: -3px 0 0; }
 .setup-submit { align-items: center; display: flex; grid-column: 1 / -1; justify-content: space-between; padding: 16px 0; gap: 16px; }
 .setup-submit p { align-items: center; color: var(--muted); display: flex; font-size: 11px; gap: 6px; margin: 0; }
+.storage-warning { background: rgba(242, 201, 76, 0.16); border-left: 3px solid #b48400; color: #655310; font-size: 12px; line-height: 1.6; padding: 8px 10px; }
+.setup-submit .storage-warning { margin-top: 8px; }
+.study-storage-warning { margin: 0 0 16px; }
 
 @media (max-width: 1100px) {
   .topbar { grid-template-columns: 12rem minmax(8rem, 1fr) auto; }
@@ -402,6 +407,7 @@ textarea::placeholder { color: #6f7984; }
   .round-complete { margin-top: 4vh; padding: 26px 20px; }
   .completion-metrics { grid-template-columns: 1fr; }
   .completion-metrics > div + div { border-left: 0; border-top: 1px solid var(--line); padding-left: 0; }
+  .completion-actions > * { justify-content: center; width: 100%; }
 }
 
 @media (max-width: 380px) {

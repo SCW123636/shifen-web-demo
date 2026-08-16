@@ -26,6 +26,7 @@ import {
   type StudyPhase,
 } from "../../model";
 import {
+  isDemoProfileVolatile,
   loadDemoProfile,
   loadDemoProgress,
   saveDemoProgress,
@@ -143,17 +144,20 @@ function UnsupportedCourse({ profile }: { profile: DemoProfile }) {
 
 export function StudyPage() {
   const profile = useMemo(loadDemoProfile, []);
+  const profileIsVolatile = useMemo(isDemoProfileVolatile, []);
   const questions = useMemo(() => questionsForCourse(profile.courseName), [profile.courseName]);
 
   if (!questions) return <UnsupportedCourse profile={profile} />;
-  return <StudyWorkspace profile={profile} questions={questions} />;
+  return <StudyWorkspace profile={profile} profileIsVolatile={profileIsVolatile} questions={questions} />;
 }
 
 function StudyWorkspace({
   profile,
+  profileIsVolatile,
   questions,
 }: {
   profile: DemoProfile;
+  profileIsVolatile: boolean;
   questions: DemoQuestion[];
 }) {
   const initialProgress = useMemo(() => loadDemoProgress(profile.courseName), [profile.courseName]);
@@ -243,8 +247,15 @@ function StudyWorkspace({
   function confirmAnswer() {
     const previousEvidenceId = confirmedEvidenceIds.find(id => isEvidenceForQuestion(id, question.questionId));
     const isSameVersion = previousEvidenceId === currentEvidenceId;
-    const previousWasCorrect = previousEvidenceId?.endsWith("_correct") ?? false;
-    const xpDelta = isSameVersion ? 0 : isCorrect ? 5 : previousWasCorrect ? -5 : 0;
+    const knownCorrectCount = confirmedEvidenceIds.filter(id => id.endsWith("_correct")).length;
+    const legacyXpIsUnattributed = earnedXp > knownCorrectCount * 5;
+    const previousWasCorrect = previousEvidenceId?.endsWith("_correct")
+      || (previousEvidenceId === `ev_demo_${question.questionId}` && legacyXpIsUnattributed);
+    const xpDelta = isSameVersion
+      ? 0
+      : isCorrect
+        ? previousWasCorrect ? 0 : 5
+        : previousWasCorrect ? -5 : 0;
 
     setConfirmationXpDelta(Math.max(0, xpDelta));
     if (!isSameVersion) {
@@ -304,35 +315,44 @@ function StudyWorkspace({
   if (roundCompleteOnMount) {
     const completionRealm = earnedXp > 0 ? "引气 · 一层" : "未入道";
     const completionEvidenceId = confirmedEvidenceIds[confirmedEvidenceIds.length - 1];
+    const hasEffectiveEvidence = confirmedEvidenceIds.length > 0;
+    const completionStatus = hasEffectiveEvidence ? "ready" as const : "unchanged" as const;
 
     return (
       <AppShell
         availableSections={{ diagnosis: false, history: false, route: false }}
         aside={
           <CultivationPanel
-            checkpoint="本轮原题已完成"
+            checkpoint={hasEffectiveEvidence ? "本轮原题已完成" : "待形成有效证据"}
             evidenceCount={confirmedEvidenceIds.length}
             evidenceId={completionEvidenceId}
             realm={completionRealm}
-            status="ready"
+            status={completionStatus}
             xp={earnedXp}
           />
         }
-        cultivation={{ realm: completionRealm, status: "ready", xp: earnedXp }}
+        cultivation={{ realm: completionRealm, status: completionStatus, xp: earnedXp }}
         profile={profile}
       >
         <section className="round-complete" aria-labelledby="round-complete-heading">
           <CheckCircle2 aria-hidden="true" size={30} />
           <span className="eyebrow">可信原题池</span>
           <h1 id="round-complete-heading">本轮可信未做原题已完成</h1>
-          <p>本轮作答记录已保留。下一阶段可进入间隔复习与变式迁移，修行进度继续沿用已确认的有效证据。</p>
+          <p>{hasEffectiveEvidence
+            ? "本轮作答记录已保留。下一阶段可进入间隔复习与变式迁移，修行进度继续沿用已确认的有效证据。"
+            : "本轮题目已全部尝试，但目前没有可确认的有效证据；掌握估计与修行 XP 均不改变。请开启新一轮重新作答或等待人工复核。"}</p>
           <div className="completion-metrics" aria-label="本轮学习结果">
             <div><span>当前证据</span><strong>{confirmedEvidenceIds.length} 条有效证据</strong></div>
             <div><span>修行进度</span><strong>{earnedXp} XP</strong></div>
           </div>
-          <Link className="primary-button" to="/setup">
-            调整下一轮计划<ArrowRight aria-hidden="true" size={17} />
-          </Link>
+          <div className="completion-actions">
+            <Link className="primary-button" to="/setup?reset=1">
+              开启新的演示轮次<RefreshCw aria-hidden="true" size={17} />
+            </Link>
+            <Link className="secondary-button" to="/setup">
+              调整课程设置<ArrowRight aria-hidden="true" size={17} />
+            </Link>
+          </div>
         </section>
       </AppShell>
     );
@@ -400,6 +420,11 @@ function StudyWorkspace({
         <FlaskConical aria-hidden="true" size={15} />
         <span>现场演示分支使用预置样例；正式批改必须来自真实作答、课程证据与学习者确认。</span>
       </div>
+      {profileIsVolatile ? (
+        <div className="storage-warning study-storage-warning" role="alert">
+          浏览器拒绝本地存储，本次课程约束仅保留在当前会话；刷新后可能恢复默认值。
+        </div>
+      ) : null}
 
       <div className="paper-layout">
         <EvidenceRail

@@ -17,6 +17,11 @@ export interface DemoProgress {
   earnedXp: number;
 }
 
+let volatileDemoProfile: DemoProfile | undefined;
+let profileStorageFallback = false;
+const volatileDemoProgress = new Map<string, DemoProgress>();
+const progressStorageFallback = new Set<string>();
+
 export const defaultDemoProfile: DemoProfile = {
   courseName: "高等数学（上）",
   examDate: "2026-08-28",
@@ -47,13 +52,44 @@ function progressKey(courseName: string) {
   return `${DEMO_PROGRESS_PREFIX}${encodeURIComponent(courseName.trim().toLowerCase())}`;
 }
 
+function evidenceScope(evidenceId: string) {
+  return evidenceId.match(/^(ev_demo_.+)_(?:correct|incorrect)$/)?.[1] ?? evidenceId;
+}
+
+function normalizeEvidenceIds(evidenceIds: string[]) {
+  const activeByQuestion = new Map<string, string>();
+  for (const evidenceId of evidenceIds) {
+    const scope = evidenceScope(evidenceId);
+    activeByQuestion.delete(scope);
+    activeByQuestion.set(scope, evidenceId);
+  }
+  return [...activeByQuestion.values()];
+}
+
+function normalizeProgress(progress: Partial<DemoProgress>): DemoProgress {
+  const attemptedIds = Array.isArray(progress.attemptedIds)
+    ? progress.attemptedIds.filter((value): value is string => typeof value === "string")
+    : [];
+  const evidenceIds = Array.isArray(progress.confirmedEvidenceIds)
+    ? progress.confirmedEvidenceIds.filter((value): value is string => typeof value === "string")
+    : [];
+  const earnedXp = Number(progress.earnedXp);
+  return {
+    attemptedIds: [...new Set(attemptedIds)],
+    confirmedEvidenceIds: normalizeEvidenceIds(evidenceIds),
+    earnedXp: Number.isFinite(earnedXp) && earnedXp >= 0 ? earnedXp : 0,
+  };
+}
+
 export function loadDemoProfile(): DemoProfile {
-  if (!canUseStorage()) return defaultDemoProfile;
+  if (!canUseStorage()) return volatileDemoProfile ?? defaultDemoProfile;
   try {
     const stored = window.sessionStorage.getItem(DEMO_PROFILE_KEY);
-    if (!stored) return defaultDemoProfile;
+    if (!stored) return profileStorageFallback && volatileDemoProfile
+      ? volatileDemoProfile
+      : defaultDemoProfile;
     const parsed = JSON.parse(stored) as Partial<DemoProfile>;
-    return {
+    const profile: DemoProfile = {
       ...defaultDemoProfile,
       ...parsed,
       targetScore: Number(parsed.targetScore ?? defaultDemoProfile.targetScore),
@@ -61,50 +97,74 @@ export function loadDemoProfile(): DemoProfile {
       materialCount: Number(parsed.materialCount ?? defaultDemoProfile.materialCount),
       materialSource: parsed.materialSource === "uploaded" ? "uploaded" : "demo",
     };
+    volatileDemoProfile = profile;
+    profileStorageFallback = false;
+    return profile;
   } catch {
-    return defaultDemoProfile;
+    return volatileDemoProfile ?? defaultDemoProfile;
   }
 }
 
 export function saveDemoProfile(profile: DemoProfile) {
-  if (!canUseStorage()) return;
+  volatileDemoProfile = { ...profile };
+  profileStorageFallback = true;
+  if (!canUseStorage()) return false;
   try {
     window.sessionStorage.setItem(DEMO_PROFILE_KEY, JSON.stringify(profile));
+    profileStorageFallback = false;
+    return true;
   } catch {
-    // The static demo remains usable when browser policy disables persistence.
+    return false;
   }
+}
+
+export function isDemoProfileVolatile() {
+  return profileStorageFallback;
 }
 
 export function loadDemoProgress(courseName: string): DemoProgress {
   const empty: DemoProgress = { attemptedIds: [], confirmedEvidenceIds: [], earnedXp: 0 };
-  if (!canUseLocalStorage()) return empty;
+  const key = progressKey(courseName);
+  if (!canUseLocalStorage()) return volatileDemoProgress.get(key) ?? empty;
   try {
-    const stored = window.localStorage.getItem(progressKey(courseName));
-    if (!stored) return empty;
-    const parsed = JSON.parse(stored) as Partial<DemoProgress>;
-    const attemptedIds = Array.isArray(parsed.attemptedIds)
-      ? parsed.attemptedIds.filter((value): value is string => typeof value === "string")
-      : [];
-    const confirmedEvidenceIds = Array.isArray(parsed.confirmedEvidenceIds)
-      ? parsed.confirmedEvidenceIds.filter((value): value is string => typeof value === "string")
-      : [];
-    const earnedXp = Number(parsed.earnedXp);
-    return {
-      attemptedIds: [...new Set(attemptedIds)],
-      confirmedEvidenceIds: [...new Set(confirmedEvidenceIds)],
-      earnedXp: Number.isFinite(earnedXp) && earnedXp >= 0 ? earnedXp : 0,
-    };
+    const stored = window.localStorage.getItem(key);
+    if (!stored) return progressStorageFallback.has(key)
+      ? volatileDemoProgress.get(key) ?? empty
+      : empty;
+    const progress = normalizeProgress(JSON.parse(stored) as Partial<DemoProgress>);
+    volatileDemoProgress.set(key, progress);
+    progressStorageFallback.delete(key);
+    return progress;
   } catch {
-    return empty;
+    return volatileDemoProgress.get(key) ?? empty;
   }
 }
 
 export function saveDemoProgress(courseName: string, progress: DemoProgress) {
-  if (!canUseLocalStorage()) return;
+  const key = progressKey(courseName);
+  const normalized = normalizeProgress(progress);
+  volatileDemoProgress.set(key, normalized);
+  progressStorageFallback.add(key);
+  if (!canUseLocalStorage()) return false;
   try {
-    window.localStorage.setItem(progressKey(courseName), JSON.stringify(progress));
+    window.localStorage.setItem(key, JSON.stringify(normalized));
+    progressStorageFallback.delete(key);
+    return true;
   } catch {
-    // The current session can continue even if progress cannot be persisted.
+    return false;
+  }
+}
+
+export function clearDemoProgress(courseName: string) {
+  const key = progressKey(courseName);
+  volatileDemoProgress.delete(key);
+  progressStorageFallback.delete(key);
+  if (!canUseLocalStorage()) return false;
+  try {
+    window.localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
   }
 }
 

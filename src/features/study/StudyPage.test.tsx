@@ -239,6 +239,28 @@ describe("StudyPage", () => {
     expect(screen.getByRole("heading", { name: /ev_demo_q-paper-2024-05_correct 已记录/ })).toBeVisible();
   });
 
+  it("migrates a legacy correct receipt without awarding duplicate XP", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      `shifen-demo-progress:${encodeURIComponent("高等数学（上）".toLowerCase())}`,
+      JSON.stringify({
+        attemptedIds: [],
+        confirmedEvidenceIds: ["ev_demo_q-paper-2024-05"],
+        earnedXp: 5,
+      }),
+    );
+    renderPage();
+
+    await user.selectOptions(screen.getByLabelText("演示场景"), "correct");
+    await user.type(screen.getByLabelText("文字答案"), "求导并比较驻点与边界。");
+    await user.click(screen.getByRole("button", { name: "提交批改" }));
+    await user.click(screen.getByRole("button", { name: "确认批改并更新路线" }));
+
+    expect(screen.getByRole("status", { name: "常驻修行摘要" })).toHaveTextContent("5 XP");
+    expect(screen.getByText("1 条有效证据")).toBeVisible();
+    expect(screen.getByRole("heading", { name: /ev_demo_q-paper-2024-05_correct 已记录/ })).toBeVisible();
+  });
+
   it("moves focus to the diagnosis and receipt as the evidence stages advance", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -459,5 +481,24 @@ describe("StudyPage", () => {
     expect(screen.getByRole("heading", { name: "本轮可信未做原题已完成" })).toBeVisible();
     expect(within(screen.getByLabelText("本轮学习结果")).getByText("2 条有效证据")).toBeVisible();
     expect(screen.queryByLabelText("文字答案")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "开启新的演示轮次" })).toHaveAttribute("href", "/setup?reset=1");
+  });
+
+  it("does not mark an attempted-only round as evidence-ready", () => {
+    window.localStorage.setItem(
+      `shifen-demo-progress:${encodeURIComponent("高等数学（上）".toLowerCase())}`,
+      JSON.stringify({
+        attemptedIds: ["q-paper-2024-05", "q-paper-2023-08"],
+        confirmedEvidenceIds: [],
+        earnedXp: 0,
+      }),
+    );
+
+    renderPage();
+
+    expect(screen.getByRole("heading", { name: "本轮可信未做原题已完成" })).toBeVisible();
+    expect(screen.getByText(/目前没有可确认的有效证据/)).toBeVisible();
+    expect(screen.getByRole("region", { name: "修行进度" })).toHaveTextContent("待形成有效证据");
+    expect(screen.getByRole("region", { name: "修行进度" })).not.toHaveTextContent("当前成长已由有效证据确认");
   });
 });
